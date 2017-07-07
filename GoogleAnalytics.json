@@ -1,0 +1,66 @@
+{
+    "module_name": "GoogleAnalytics", 
+    "module_type": "web_analytics", 
+    "USER_INPUT_JSON": {
+        "capability": {
+            "ds_config_validation_mode": "AUTO", 
+            "preview_enabled": false, 
+            "minimum_schedule_frequency": 0, 
+            "config_validation_required": true, 
+            "schedule_type": "PERIOD"
+        }, 
+        "fields": {
+            "ga_report_type": {
+                "long_desc": "", 
+                "server_auto_suggest": false, 
+                "dependent_on": false, 
+                "key": "ga_report_type", 
+                "placeholder": "", 
+                "default_value": "desktop",
+                "server_validate": false, 
+                "pattern": null, 
+                "required": false, 
+                "short_desc": "", 
+                "label": "select report type", 
+                "type": "SINGLE_SELECT_LIST"
+            }
+        }, 
+        "ux": {
+            "attributes": {
+                "ga_report_type": {
+                    "items": [
+                        {
+                            "name": "Desktop", 
+                            "value": "desktop"
+                        }, 
+                        {
+                            "name": "Mobile", 
+                            "value": "mobile"
+                        }
+                    ], 
+                    "ui_type": "", 
+                    "onChange": "", 
+                    "list_type": "STATIC", 
+                    "size": null
+                }
+            }, 
+            "edit_layout": [], 
+            "layout": [
+                {
+                    "width": {
+                        "value": "100", 
+                        "unit": "%"
+                    }, 
+                    "classes": "", 
+                    "type": "field", 
+                    "key": "ga_report_type"
+                }
+            ]
+        }
+    }, 
+    "AUTH": {
+        "has_profiles": true,
+        "type": "OAUTH2"
+    }, 
+    "module_code": "GoogleAnalytics"
+}

@@ -1,0 +1,6 @@
+{
+    "package_code": "GoogleAnalytics", 
+    "module_class_name": "GoogleAnalytics", 
+    "entry_module_name": "googleanalytics_app_interface", 
+    "relative_path": "googleanalytics"
+}
