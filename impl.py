@@ -86,12 +86,17 @@ class GoogleAnalyticsManager(ThreePBase):
 
         #print('*********************************************************************')
         credentials_json  = credentials.to_json()
-        credentials_data = json.loads(credentials_json)
+        #credentials_data = json.loads(credentials_json)
         #print(type(credentials_data))
         #print(credentials_data)
         #print('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
         #print(credentials_data["id_token"]["name"])
         #print('*********************************************************************')
+
+        #except client.AccessTokenRefreshError:
+        #print('The credentials have been revoked or expired, please re-run'
+          #    'the application to re-authorize.')
+
 
         identity_config = {
             'credentials': credentials_json
@@ -135,8 +140,10 @@ class GoogleAnalyticsManager(ThreePBase):
         """
         # using make_kv_list method here, You can use your own logic.
 
+
         formatted_list = make_kv_list(identity_list, sdkconst.FIELD_IDS.VALUE,
                                        sdkconst.FIELD_IDS.NAME)
+
         return formatted_list
 
 
@@ -161,23 +168,6 @@ class GoogleAnalyticsManager(ThreePBase):
             :return:  ds_config_spec.
             Any dynamic changes to ds_config_spec, if required, should be made here.
         """
-        '''print('$$$$$$$$$$$$%%%%%%%%%%%%###############')
-        print(identity_config)
-        http = httplib2.Http()
-        credentials = OAuth2Credentials.from_json(identity_config.get('credentials'))'''
-        # identity = Identities.get_by_id()
-
-
-        '''http = credentials.authorize(http)
-        service = build('analytics', 'v3', http=http)
-        service_data = service.data().ga().get(
-            ids='ga:' + '40034972',
-            start_date='2012-04-01',
-            end_date='2012-08-01',
-            metrics='ga:sessions',
-            dimensions='ga:date').execute()'''
-
-
 
 
         return ds_config_spec

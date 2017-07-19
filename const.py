@@ -8,12 +8,11 @@ PROMPT_TYPE = 'consent'
 GA_METRIC_SETS = {
         'desktop': {
             'METRICS': ['ga:sessions', 'ga:percentNewSessions', 'ga:pageviews'],
-            'DIMENSIONS': ['ga:date', 'ga:browser', 'ga:operatingSystem', 'ga:deviceCategory', 'ga:pagePath']
+            'DIMENSIONS': ['ga:date', 'ga:browser', 'ga:operatingSystem', 'ga:deviceCategory','ga:country','ga:region','ga:city']
         },
         'mobile': {
             'METRICS': ['ga:sessions', 'ga:percentNewSessions', 'ga:pageviews'],
-            'DIMENSIONS': ['ga:date', 'ga:browser', 'ga:operatingSystem', 'ga:mobileDeviceInfo', 'ga:deviceCategory',
-                           'ga:pagePath']
+            'DIMENSIONS': ['ga:date', 'ga:browser', 'ga:operatingSystem', 'ga:mobileDeviceInfo', 'ga:deviceCategory','ga:country','ga:region']
         }
     }
 

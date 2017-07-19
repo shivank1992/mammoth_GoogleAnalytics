@@ -1,4 +1,5 @@
 # encoding: utf-8
+import argparse
 import logging
 import const
 import sdk.const as sdkconst
@@ -8,6 +9,9 @@ import httplib2
 from oauth2client.client import OAuth2WebServerFlow, OAuth2Credentials
 from apiclient.discovery import build
 import time
+import sys
+import string
+from apiclient.errors import HttpError
 
 log = logging
 
@@ -47,76 +51,192 @@ class GoogleAnalyticsDataYielder(DataYielder):
         #target = open(file_path, 'wb')
         #writer = csv.writer(target, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
 
-        print('\n************************Identity Config********************************\n')
+        #print('\n************************Identity Config********************************\n')
 
-        print self.identity_config
-        print('\n************************Pulled Data********************************\n')
+        #print self.identity_config
+        #print('\n************************Pulled Data********************************\n')
 
-        print self.res
-        print('\n***************************MetaData*********************************\n')
-        print(type(self.metadata))
-        print self.metadata
-        print('\n***************************End of MetaData*********************************\n')
-        print(self.start_date,type(self.start_date))
-        print(self.end_date, type(self.start_date))
-        print (self.ds_config.get('ga_report_type'))
+        #print self.get_ga_data_for_metadata()
+        #print('\n***************************MetaData*********************************\n')
+        #print(type(self.metadata))
+        #print self.metadata
+        #print('\n***************************End of MetaData*********************************\n')
+        #print(self.start_date,type(self.start_date))
+        #print(self.end_date, type(self.start_date))
+        #print (self.ds_config.get('ga_report_type'))
 
-        f = open(file_path, 'wt')
 
-        # Wrap file with a csv.writer
-        writer = csv.writer(f, lineterminator='\n')
+        #Get variables from get_ga_data_for_metadata to use in Paging function
+        service = self.service
+        accounts = service.management().accounts().list().execute()
+        firstAccountId = accounts.get('items')[0].get('id')
+        webproperties = service.management().webproperties().list(accountId="~all").execute()
+        property = webproperties.get('items')[0].get('id')
+        profiles = service.management().profiles().list(accountId=firstAccountId,webPropertyId=property).execute()
 
-        # Write header.
-        # header = [h['display_name'] for h in self.metadata]  # this takes the display name as the column as the header
+        # Get Profile Url
+        profile_url = profiles.get('items')[0].get('websiteUrl')
 
-        #writer.writerow(header)
-        #print(''.join('%30s' % h for h in header))
+        # Get Profile ID
+        profile_id = webproperties.get('items')[0].get('defaultProfileId')
 
-        # Write data table.
-        res = self.res
-        if res.get('rows', []):
-            for row in res.get('rows'):
-                writer.writerow(row)
-                #print(''.join('%30s' % r for r in row))
+        start_date = self.start_date_ddmmyyyy
+        end_date = self.end_date_ddmmyyyy
 
-                #print('\n')
-                #print('Success Data Written to CSV File')
+        date_ranges = [(start_date, end_date)]
 
-        f.close()
+        print('\n************************Date Ranges********************************\n')
+
+        print(profile_id, date_ranges, profile_url)
+        profile_ids = {profile_url: profile_id}
+        #list here for multiple profiles
+        # ,
+        # ('2015-10-01',
+        # '2015-10-31'),
+        # ('2015-11-01',
+        # '2015-11-30',
+        # ('2015-12-01',
+        # '2015-12-31')]
+
+        #Paging Function starts here
+        class SampledDataError(Exception):pass
+        def main(argv):
+            # Try to make a request to the API. Print the results or handle errors.
+            try:
+                profile_id = profile_ids[profile]
+                if not profile_id:
+                    print('Could not find a valid profile for this user.')
+                else:
+                    for start_date, end_date in date_ranges:
+                        limit = ga_query(service, profile_id, 0, start_date, end_date).get('totalResults')
+                        for pag_index in xrange(0, limit, 10000):
+                            results = ga_query(service, profile_id, pag_index, start_date, end_date)
+                            if results.get('containsSampledData'):
+                                raise SampledDataError
+                            print_results(results, pag_index, start_date, end_date)
+
+
+            except TypeError, error:
+                # Handle errors in constructing a query.
+                print('There was an error in constructing your query' % error)
+
+            except HttpError, error:
+                # Handle API errors.
+                print('Arg, there was an API error : %s : %s' % (error.resp.status, error._get_reason()))
+
+            except AccessTokenRefreshError:
+                # Handle Auth errors.
+                print('The credentials have been revoked or expired, please re-run ' 'the application to re-authorize')
+
+            except SampledDataError:
+                # force an error if ever a query returns data that is sampled!
+                print('Error: Query contains sampled data!')
+
+
+        def ga_query(service, profile_id, pag_index, start_date, end_date):
+            return service.data().ga().get(
+                ids='ga:' + profile_id,
+                start_date=start_date,
+                end_date=end_date,
+                metrics='ga:sessions, ga:percentNewSessions, ga:pageviews',
+                dimensions='ga:date,ga:sourceMedium,ga:networkLocation,ga:country,ga:region,ga:city',
+                sort='-ga:pageviews',
+                samplingLevel='HIGHER_PRECISION',
+                start_index=str(pag_index + 1),
+                max_results=str(pag_index + 10000)).execute()
+
+        def print_results(results, pag_index, start_date, end_date):
+            """Prints out the results.
+            This prints out the profile name, the column headers, and all the rows of
+            data.
+            Args:
+              results: The response returned from the Core Reporting API.
+            """
+
+            # New write header
+            if pag_index == 0:
+                if (start_date, end_date) == date_ranges[0]:
+                    print('Profile Name: %s' % results.get('profileInfo').get('profileName'))
+                    columnHeaders = results.get('columnHeaders')
+                    cleanHeaders = [str(h['name']) for h in columnHeaders]
+                    writer.writerow(cleanHeaders)
+                print('Now pulling data from %s to %s.' % (start_date, end_date))
+
+            # Print data table.
+            if results.get('rows', []):
+                for row in results.get('rows'):
+                    for i in range(len(row)):
+                        old, new = row[i], str()
+                        for s in old:
+                            new += s if s in string.printable else ''
+                        row[i] = new
+                    writer.writerow(row)
+
+            else:
+                print('No Rows Found')
+
+            limit = results.get('totalResults')
+            print(pag_index, 'of about', int(round(limit, -4)), 'rows.')
+            return None
+
+
+
+        for profile in sorted(profile_ids):
+            with open(file_path, 'wt') as f:
+
+                writer = csv.writer(f, lineterminator='\n')
+                if __name__ == '__main__': main(sys.argv)
+                f.close()
+            print('%s done. Next profile...' % profile)
+
+        print("All profiles done.")
+
         log.info("file saved at :{0}".format(file_path))
         return {}
 
-    def get_GA_data(self):
+    def get_ga_data_for_metadata(self):
         http = httplib2.Http()
         credentials = OAuth2Credentials.from_json(self.identity_config.get('credentials'))
         # identity = Identities.get_by_id()
         http = credentials.authorize(http)
-        service = build('analytics', 'v3', http=http, cache_discovery=False)
+        self.service = build('analytics', 'v3', http=http, cache_discovery=False)
+        accounts = self.service.management().accounts().list().execute()
+        firstAccountId = accounts.get('items')[0].get('id')
+        webproperties = self.service.management().webproperties().list(accountId="~all").execute()
+        property = webproperties.get('items')[0].get('id')
+        profiles = self.service.management().profiles().list(accountId=firstAccountId,webPropertyId=property).execute()
 
-        webproperties = service.management().webproperties().list(
-            accountId="~all").execute()
+        #Get Profile Url
+        self.profile_url = profiles.get('items')[0].get('websiteUrl')
 
-        profile_id = webproperties.get('items')[0].get('defaultProfileId')
+        #Get Profile ID
+        self.profile_id = webproperties.get('items')[0].get('defaultProfileId')
 
         #time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(1347517370))
         #time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(1347517370))
-        res = service.data().ga().get(
-            ids="ga:" + profile_id,
+
+        #print(self.start_date, type(self.start_date[0]))
+        #print(self.end_date, type(self.end_date))
+        self.start_date_ddmmyyyy = time.strftime('%Y-%m-%d', time.gmtime((self.start_date[0])))
+        self.end_date_ddmmyyyy = time.strftime('%Y-%m-%d', time.gmtime((self.end_date)))
+
+        ga_data_for_metadata = self.service.data().ga().get(
+            ids="ga:" + self.profile_id,
             dimensions=",".join(const.GA_METRIC_SETS[self.ds_config.get('ga_report_type')]['DIMENSIONS']),
-            start_date='2017-01-01',
-            end_date='yesterday',
-            max_results=100,
+            start_date=self.start_date_ddmmyyyy,
+            end_date=self.end_date_ddmmyyyy,
+            max_results=10,
             start_index=1,
             metrics=",".join(const.GA_METRIC_SETS[self.ds_config.get('ga_report_type')]['METRICS'])).execute()
 
-        return res
+        return ga_data_for_metadata
 
     def get_metadata(self):
 
 
         metadata = []
 
-        col_headers = self.res['columnHeaders']
+        col_headers = self.ga_data_for_metadata['columnHeaders']
         for column in col_headers:
             if column['name'] == "ga:date":
                 metadata.append({'display_name': 'Date',
@@ -178,7 +298,7 @@ class GoogleAnalyticsDataYielder(DataYielder):
                                                        identity_key)
 
         self.ds_config = self.storage_handle.get(identity_key, ds_config_key)
-        self.res = self.get_GA_data()
+        self.ga_data_for_metadata = self.get_ga_data_for_metadata()
         self.metadata = self.get_metadata()
 
 
@@ -199,10 +319,9 @@ class GoogleAnalyticsDataYielder(DataYielder):
                     'type': COLUMN DATATYPE -  TEXT/DATE/NUMERIC
                }
         """
-        print('\n***************************MetaData*********************************\n')
-        print(type(self.metadata))
-        print self.metadata
-        print('\n***************************End of MetaData*********************************\n')
-        print(self.ds_config)
+        #print('\n***************************MetaData*********************************\n')
+        #print(type(self.metadata))
+        #print self.metadata
+        #print('\n***************************End of MetaData*********************************\n')
 
         return self.metadata
