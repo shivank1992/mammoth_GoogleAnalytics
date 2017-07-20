@@ -80,23 +80,33 @@ class GoogleAnalyticsDataYielder(DataYielder):
         # Get Profile ID
         profile_id = webproperties.get('items')[0].get('defaultProfileId')
 
-        start_date = self.start_date_ddmmyyyy
-        end_date = self.end_date_ddmmyyyy
+        start_date = self.start_date_yyyymmdd
+        end_date = self.end_date_yyyymmdd
 
+
+        # Multiple dates can queried using this type of format.
         date_ranges = [(start_date, end_date)]
+        ##date_ranges = [(start_date1, end_date1),(start_date2, end_date2),(start_date3, end_date3)]
+        ## Eg : User can query data for the first 15 days of every month using this kind of format.
+        # date_ranges = [('2017-01-01','2017-01-15'),
+        # ('2017-02-01','2017-02-15'),
+        # ('2017-03-01','2017-03-15')]
 
-        print('\n************************Date Ranges********************************\n')
+        #Dimensions from User
+        user_dimensions = ",".join(const.GA_METRIC_SETS[self.ds_config.get('ga_report_type')]['DIMENSIONS'])
 
-        print(profile_id, date_ranges, profile_url)
+        #Metrics from User
+        user_metrics = ",".join(const.GA_METRIC_SETS[self.ds_config.get('ga_report_type')]['METRICS'])
+
+        # Make a list of Multiple profiles in profile_ids to query multiple profiles in one single query.
         profile_ids = {profile_url: profile_id}
-        #list here for multiple profiles
-        # ,
-        # ('2015-10-01',
-        # '2015-10-31'),
-        # ('2015-11-01',
-        # '2015-11-30',
-        # ('2015-12-01',
-        # '2015-12-31')]
+
+        print('\n************************Data Check before CSV Query********************************\n')
+
+        print(profile_id, date_ranges,user_dimensions,user_metrics, profile_url)
+        profile_ids = {profile_url: profile_id}
+        #list here for multiple profiles in one single query.
+
 
         #Paging Function starts here
         class SampledDataError(Exception):pass
@@ -108,9 +118,9 @@ class GoogleAnalyticsDataYielder(DataYielder):
                     print('Could not find a valid profile for this user.')
                 else:
                     for start_date, end_date in date_ranges:
-                        limit = ga_query(service, profile_id, 0, start_date, end_date).get('totalResults')
+                        limit = ga_query(service, profile_id, 0, start_date, end_date, user_metrics,user_dimensions).get('totalResults')
                         for pag_index in xrange(0, limit, 10000):
-                            results = ga_query(service, profile_id, pag_index, start_date, end_date)
+                            results = ga_query(service, profile_id, pag_index, start_date, end_date,user_metrics,user_dimensions)
                             if results.get('containsSampledData'):
                                 raise SampledDataError
                             print_results(results, pag_index, start_date, end_date)
@@ -133,13 +143,13 @@ class GoogleAnalyticsDataYielder(DataYielder):
                 print('Error: Query contains sampled data!')
 
 
-        def ga_query(service, profile_id, pag_index, start_date, end_date):
+        def ga_query(service, profile_id, pag_index, start_date, end_date, user_metrics, user_dimensions):
             return service.data().ga().get(
                 ids='ga:' + profile_id,
                 start_date=start_date,
                 end_date=end_date,
-                metrics='ga:sessions, ga:percentNewSessions, ga:pageviews',
-                dimensions='ga:date,ga:sourceMedium,ga:networkLocation,ga:country,ga:region,ga:city',
+                metrics=user_metrics,
+                dimensions=user_dimensions,
                 sort='-ga:pageviews',
                 samplingLevel='HIGHER_PRECISION',
                 start_index=str(pag_index + 1),
@@ -217,14 +227,14 @@ class GoogleAnalyticsDataYielder(DataYielder):
 
         #print(self.start_date, type(self.start_date[0]))
         #print(self.end_date, type(self.end_date))
-        self.start_date_ddmmyyyy = time.strftime('%Y-%m-%d', time.gmtime((self.start_date[0])))
-        self.end_date_ddmmyyyy = time.strftime('%Y-%m-%d', time.gmtime((self.end_date)))
+        self.start_date_yyyymmdd = time.strftime('%Y-%m-%d', time.gmtime((self.start_date[0])))
+        self.end_date_yyyymmdd = time.strftime('%Y-%m-%d', time.gmtime((self.end_date)))
 
         ga_data_for_metadata = self.service.data().ga().get(
             ids="ga:" + self.profile_id,
             dimensions=",".join(const.GA_METRIC_SETS[self.ds_config.get('ga_report_type')]['DIMENSIONS']),
-            start_date=self.start_date_ddmmyyyy,
-            end_date=self.end_date_ddmmyyyy,
+            start_date=self.start_date_yyyymmdd,
+            end_date=self.end_date_yyyymmdd,
             max_results=10,
             start_index=1,
             metrics=",".join(const.GA_METRIC_SETS[self.ds_config.get('ga_report_type')]['METRICS'])).execute()
